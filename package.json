@@ -1,0 +1,27 @@
+{
+  "name": "bot-discord-aws",
+  "version": "1.0.0",
+  "description": "Discord bot to get AWS info",
+  "main": "index.js",
+  "scripts": {
+    "local": "nodemon",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kascharowski/bot-discord-aws.git"
+  },
+  "author": "Diego Kascharowski",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/kascharowski/bot-discord-aws/issues"
+  },
+  "homepage": "https://github.com/kascharowski/bot-discord-aws#readme",
+  "dependencies": {
+    "@discordjs/rest": "^0.3.0",
+    "aws-sdk": "^2.1091.0",
+    "discord-api-types": "^0.29.0",
+    "discord.js": "^13.6.0",
+    "dotenv": "^16.0.0"
+  }
+}
