@@ -9,8 +9,12 @@ const awsOptions = {
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
 }
+
 const secretsManager = new aws.SecretsManager(awsOptions);
+
 let nextToken = ''
+const acceptedCommands = ['list', 'next', 'secret']
+
 
 const listSecrets = async (params) => {
   try {
@@ -70,6 +74,7 @@ const formatSecretValuesMessage = (secret) => {
         message += `\`${key}: ${secret[key]}\`\n`
       }
     }
+    messageArray.push(message)
     return messageArray
   } catch (error) {
     console.log('error', error)
@@ -86,6 +91,11 @@ client.on('messageCreate', async msg => {
     if(msg.author.bot) return;
 
     if(!cleanMessage.startsWith('!aws')) return;
+
+    if(!acceptedCommands.includes(cleanMessage.split(' ')[1])){
+      msg.channel.send(`\`${cleanMessage.split(' ')[1]}\` Não é um comando válido`)
+      return
+    }
 
     if ( (cleanMessage.search("list") != -1) ) {
       const params = {
@@ -118,7 +128,7 @@ client.on('messageCreate', async msg => {
     }
 
     if ( (cleanMessage.search("next") != -1) ) {
-      if(!nextToken)
+      // if(!nextToken)
         return msg.channel.send('Não há mais resultados')
 
       getNextValues(nextToken).then(data => {
