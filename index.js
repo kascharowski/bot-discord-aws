@@ -19,14 +19,15 @@ const acceptedCommands = ['list', 'next', 'secret']
 const listSecrets = async (params) => {
   try {
     const data = await secretsManager.listSecrets(params).promise()
-    if (!data || data.SecretList.length === 0) {
-      console.log('No secrets found')
+
+    if (!data || data.SecretList.length === 0)
       throw new Error('No secrets found')
-    }
+
     const dataFilter = data.SecretList.filter(secret => secret.Name.search("development") != -1)
-    if(data.NextToken){
+
+    if(data.NextToken)
       nextToken = data.NextToken
-    }
+
     return dataFilter
   } catch (error) {
     console.log(error)
@@ -35,12 +36,25 @@ const listSecrets = async (params) => {
 }
 
 const getNextValues = async (token) => {
-  const params = {
-    SortOrder: "asc",
-    NextToken: token
+  try {
+    const params = {
+      Filters: [
+        {
+          Key: 'name',
+          Values: [
+            '!development'
+          ]
+        }
+      ],
+      SortOrder: "asc",
+      NextToken: token
+    }
+    const data = await secretsManager.listSecrets(params).promise()
+    return data
+  } catch (error) {
+    console.log(error)
+    throw error
   }
-  const data = await secretsManager.listSecrets(params).promise()
-  return data
 }
 
 const formatListMessage = (data) => {
@@ -59,7 +73,7 @@ const formatSecretValuesMessage = (secret) => {
 
     for(let key in secret){
       // Before adding the key to the message, check if the message is too long(2000 characters)
-      if(message.length + key.length + secret[key].length + 1 > 2000){
+      if(message.length + key.length + secret[key].length + 1 > 1999){
         messageArray.push(message)
         message = ''
       } else {
@@ -71,7 +85,7 @@ const formatSecretValuesMessage = (secret) => {
         if(key.toLowerCase().search("password") != -1){
           secret[key] = "<password>"
         }
-        message += `\`${key}: ${secret[key]}\`\n`
+        message += `\`${key}=${secret[key]}\`\n`
       }
     }
     messageArray.push(message)
@@ -81,20 +95,36 @@ const formatSecretValuesMessage = (secret) => {
   }
 }
 
+const checkCommands = (message) => {
+  if(!acceptedCommands.includes(message.split(' ')[1]))
+    return false
+
+  return true
+}
+
+const sendMessage = async (message, channel) => {
+  try {
+    await channel.send(message)
+  } catch (error) {
+    console.log(error)
+  }
+}
+
 client.on('ready', () => {
   console.log(`Logged as: ${client.user.tag}!`);
 });
 
 client.on('messageCreate', async msg => {
     let cleanMessage = msg.content.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    let returnMessage = ''
 
     if(msg.author.bot) return;
 
     if(!cleanMessage.startsWith('!aws')) return;
 
-    if(!acceptedCommands.includes(cleanMessage.split(' ')[1])){
-      msg.channel.send(`\`${cleanMessage.split(' ')[1]}\` Não é um comando válido`)
-      return
+    if(!checkCommands(cleanMessage)){
+      returnMessage = `\`${cleanMessage.split(' ')[1]}\` Não é um comando válido`
+      return sendMessage(returnMessage, msg.channel)
     }
 
     if ( (cleanMessage.search("list") != -1) ) {
@@ -112,14 +142,14 @@ client.on('messageCreate', async msg => {
 
       listSecrets(params).then(data => {
         if(data.length == 0)
-          return msg.channel.send('Nenhum resultado encontrado')
+          return sendMessage('Nenhum resultado encontrado')
 
         let message = formatListMessage(data)
 
         if(nextToken)
-          message += '\n Para ver mais resultados, digite: `!aws next`'
+          sendMessage('\n Para ver mais resultados, digite: `!aws next`', msg.channel)
 
-        msg.channel.send(message)
+        return sendMessage(message, msg.author)
       })
       .catch(error => {
         console.log(error)
@@ -128,30 +158,28 @@ client.on('messageCreate', async msg => {
     }
 
     if ( (cleanMessage.search("next") != -1) ) {
-      // if(!nextToken)
-        return msg.channel.send('Não há mais resultados')
+      if(!nextToken)
+        return sendMessage('Não há mais resultados', msg.channel)
 
       getNextValues(nextToken).then(data => {
         if(data.SecretList.length == 0)
-          return msg.channel.send('Nenhum resultado encontrado')
+          return sendMessage('Nenhum resultado encontrado', msg.channel)
 
         let secrets = data.SecretList.filter(secret => secret.Name.search("development") != -1)
         if(secrets.length == 0){
-
           if(data.NextToken)
-            msg.channel.send('Não há resultados válidos nesta página, para ver mais resultados, digite: `!aws next`')
+            sendMessage('Não há resultados válidos nesta página, para ver mais resultados, digite: `!aws next`', msg.channel)
           else
-            msg.channel.send('Não há mais resultados')
-
+            sendMessage('Não há mais resultados', msg.channel)
           return
         }
 
-        let message = formatListMessage(data)
-        msg.channel.send(message)
+        let message = formatListMessage(data.SecretList)
+        sendMessage(message, msg.author)
 
         if(data.NextToken){
           nextToken = data.NextToken
-          msg.channel.send('Para ver mais resultados, digite: `!aws next`')
+          msg.channel.send('Para ver mais resultados, digite: `!aws next`', msg.channel)
         }
       })
     }
@@ -160,7 +188,7 @@ client.on('messageCreate', async msg => {
       try {
         let secretName = cleanMessage.split(' ')[2]
         if(!secretName)
-          return msg.channel.send('Nome do Secret não informado')
+          return sendMessage('Nome do Secret não informado', msg.channel)
 
         let params = {
           SecretId: secretName
@@ -169,24 +197,25 @@ client.on('messageCreate', async msg => {
         secretsManager.getSecretValue(params, function(err, data) {
           if (err) {
             console.log(err, err.stack);
-            msg.channel.send('Problemas ao tentar buscar o Secret')
+            sendMessage('Problemas ao tentar buscar o Secret', msg.channel)
           }
           else{
-            if(data?.SecretString == '')
-              msg.channel.send('Secret não encontrado')
-            else{
-              // Ready each property in data.SecretString object and send it to the channel
-              const secret = JSON.parse(data.SecretString)
-              const message = formatSecretValuesMessage(secret)
-              message.forEach(message => {
-                msg.channel.send(message)
-              })
-            }
+            if(!data?.SecretString)
+              throw new Error('Secret não encontrado')
+
+            // Ready each property in data.SecretString object and send it to the channel
+            const secret = JSON.parse(data.SecretString)
+            const message = formatSecretValuesMessage(secret)
+            sendMessage(`Enviando dados do projeto: \`${secretName}\`\n`, msg.author)
+            sendMessage(`Enviando dados do projeto: \`${secretName}\` para: ${msg.author}\n`, msg.channel)
+            message.forEach(message => {
+              sendMessage(message, msg.author)
+            })
           }
         });
       } catch (error) {
         console.log(error)
-        msg.channel.send('Houve algum erro, tente novamente mais tarde')
+        sendMessage('Houve algum erro, tente novamente mais tarde', msg.channel)
       }
     }
 });
