@@ -1,3 +1,6 @@
+/* eslint-disable no-shadow */
+/* eslint-disable consistent-return */
+
 import * as discordJs from 'discord.js';
 import * as aws from 'aws-sdk';
 
@@ -21,9 +24,9 @@ const listSecrets = async (params: aws.SecretsManager.ListSecretsRequest) => {
   try {
     const data = await secretsManager.listSecrets(params).promise();
 
-    if (!data || data.SecretList.length === 0) { throw new Error('No secrets found'); }
+    if (!data || data.SecretList?.length === 0) { throw new Error('No secrets found'); }
 
-    const dataFilter = data.SecretList.filter((secret) => secret.Name.search('development') !== -1);
+    const dataFilter = data.SecretList?.filter((secret) => secret.Name?.search('development') !== -1);
 
     if (data.NextToken) { nextToken = data.NextToken; }
 
@@ -56,15 +59,17 @@ const getNextValues = async (token: aws.SecretsManager.NextTokenType) => {
   }
 };
 
-const formatListMessage = (data: aws.SecretsManager.SecretListEntry[]) => {
+const formatListMessage = (data: aws.SecretsManager.SecretListEntry[] | undefined) => {
   let message = '';
-  data.forEach((secret) => {
-    message += `\`${secret.Name}\`\n`;
-  });
+  if (data) {
+    data.forEach((secret) => {
+      message += `\`${secret.Name}\`\n`;
+    });
+  }
   return message;
 };
 
-const formatSecretValuesMessage = (secret: Object): string[] => {
+const formatSecretValuesMessage = (secret: {[key:string]: string}): string[] | undefined => {
   try {
     // If message is too long split it into multiple messages
     let message = '';
@@ -93,7 +98,7 @@ const formatSecretValuesMessage = (secret: Object): string[] => {
     messageArray.push(message);
     return messageArray;
   } catch (error) {
-    return console.log('error', error);
+    console.log('error', error);
   }
 };
 
@@ -119,7 +124,7 @@ const sendMessage = async (message: string, channel: discordChannel) => {
 };
 
 client.on('ready', () => {
-  console.log(`Logged as: ${client.user.tag}!`);
+  console.log(`Logged as: ${client.user?.tag}!`);
 });
 
 client.on('messageCreate', async (msg) => {
@@ -149,7 +154,7 @@ client.on('messageCreate', async (msg) => {
     };
 
     listSecrets(params).then((data) => {
-      if (data.length === 0) { return sendMessage('Nenhum resultado encontrado', msg.channel); }
+      if (data?.length === 0) { return sendMessage('Nenhum resultado encontrado', msg.channel); }
 
       const message = formatListMessage(data);
 
@@ -163,14 +168,14 @@ client.on('messageCreate', async (msg) => {
       });
   }
 
-  if ((cleanMessage.search('next') != -1)) {
+  if ((cleanMessage.search('next') !== -1)) {
     if (!nextToken) { return sendMessage('Não há mais resultados', msg.channel); }
 
     getNextValues(nextToken).then((data) => {
-      if (data.SecretList.length === 0) { return sendMessage('Nenhum resultado encontrado', msg.channel); }
+      if (data.SecretList?.length === 0) { return sendMessage('Nenhum resultado encontrado', msg.channel); }
 
-      const secrets = data.SecretList.filter((secret) => secret.Name.search('development') !== -1);
-      if (secrets.length == 0) {
+      const secrets = data.SecretList?.filter((secret) => secret.Name?.search('development') !== -1);
+      if (secrets?.length === 0) {
         if (data.NextToken) {
           sendMessage('Não há resultados válidos nesta página, para ver mais resultados, digite: `!aws next`', msg.channel);
         } else {
@@ -184,7 +189,7 @@ client.on('messageCreate', async (msg) => {
 
       if (data.NextToken) {
         nextToken = data.NextToken;
-        msg.channel.send('Para ver mais resultados, digite: `!aws next`', msg.channel);
+        msg.channel.send('Para ver mais resultados, digite: `!aws next`');
       }
     });
   }
@@ -210,7 +215,7 @@ client.on('messageCreate', async (msg) => {
           const message = formatSecretValuesMessage(secret);
           sendMessage(`Enviando dados do projeto: \`${secretName}\`\n`, msg.author);
           sendMessage(`Enviando dados do projeto: \`${secretName}\` para: ${msg.author}\n`, msg.channel);
-          message.forEach((message) => {
+          message?.forEach((message) => {
             sendMessage(message, msg.author);
           });
         }
