@@ -23,7 +23,7 @@ const listSecrets = async (params: aws.SecretsManager.ListSecretsRequest) => {
 
     if (!data || data.SecretList.length === 0) { throw new Error('No secrets found'); }
 
-    const dataFilter = data.SecretList.filter((secret) => secret.Name.search('development') != -1);
+    const dataFilter = data.SecretList.filter((secret) => secret.Name.search('development') !== -1);
 
     if (data.NextToken) { nextToken = data.NextToken; }
 
@@ -64,7 +64,7 @@ const formatListMessage = (data: aws.SecretsManager.SecretListEntry[]) => {
   return message;
 };
 
-const formatSecretValuesMessage = (secret) => {
+const formatSecretValuesMessage = (secret: Object) => {
   try {
     // If message is too long split it into multiple messages
     let message = '';
@@ -77,11 +77,11 @@ const formatSecretValuesMessage = (secret) => {
         message = '';
       } else {
         // On mongoDB secrets, remove user and password from connection string, all after: mongodb:// and before @, and replace with <user>:<password>
-        if (key.search('mongoDB') != -1) {
+        if (key.search('mongoDB') !== -1) {
           secret[key] = secret[key].replace(/mongodb:\/\/(.*)@/, 'mongodb://<user>:<password>@');
         }
         // If key is a password, replace value with <password>
-        if (key.toLowerCase().search('password') != -1) {
+        if (key.toLowerCase().search('password') !== -1) {
           secret[key] = '<password>';
         }
         message += `\`${key}=${secret[key]}\`\n`;
@@ -90,7 +90,7 @@ const formatSecretValuesMessage = (secret) => {
     messageArray.push(message);
     return messageArray;
   } catch (error) {
-    console.log('error', error);
+    return console.log('error', error);
   }
 };
 
