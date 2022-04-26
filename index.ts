@@ -1,10 +1,10 @@
+import * as discordJs from 'discord.js';
+import * as aws from 'aws-sdk';
+
 require('dotenv').config();
-// const { Client } = require('discord.js');
-import {Client} from 'discord.js';
+
 // Intents can be calculated at: https://ziad87.net/intents/
-const client = new Client({ intents: 513 });
-// const aws = require('aws-sdk');
-import * as aws from 'aws-sdk'
+const client = new discordJs.Client({ intents: 513 });
 
 const awsOptions: aws.SecretsManager.ClientConfiguration = {
   region: process.env.AWS_REGION,
@@ -14,18 +14,18 @@ const awsOptions: aws.SecretsManager.ClientConfiguration = {
 
 const secretsManager = new aws.SecretsManager(awsOptions);
 
-let nextToken = '';
+let nextToken: aws.SecretsManager.NextTokenType;
 const acceptedCommands = ['list', 'next', 'secret'];
 
-const listSecrets = async (params) => {
+const listSecrets = async (params: aws.SecretsManager.ListSecretsRequest) => {
   try {
     const data = await secretsManager.listSecrets(params).promise();
 
-    if (!data || data.SecretList.length === 0) {throw new Error('No secrets found')};
+    if (!data || data.SecretList.length === 0) { throw new Error('No secrets found'); }
 
     const dataFilter = data.SecretList.filter((secret) => secret.Name.search('development') != -1);
 
-    if (data.NextToken) {nextToken = data.NextToken};
+    if (data.NextToken) { nextToken = data.NextToken; }
 
     return dataFilter;
   } catch (error) {
@@ -34,7 +34,7 @@ const listSecrets = async (params) => {
   }
 };
 
-const getNextValues = async (token) => {
+const getNextValues = async (token: aws.SecretsManager.NextTokenType) => {
   try {
     const params = {
       Filters: [
@@ -42,7 +42,7 @@ const getNextValues = async (token) => {
           Key: 'name',
           Values: [
             '!development',
-          ]
+          ],
         },
       ],
       SortOrder: 'asc',
@@ -56,7 +56,7 @@ const getNextValues = async (token) => {
   }
 };
 
-const formatListMessage = (data) => {
+const formatListMessage = (data: aws.SecretsManager.SecretListEntry[]) => {
   let message = '';
   data.forEach((secret) => {
     message += `\`${secret.Name}\`\n`;
@@ -95,7 +95,7 @@ const formatSecretValuesMessage = (secret) => {
 };
 
 const checkCommands = (message) => {
-  if (!acceptedCommands.includes(message.split(' ')[1])) {return false};
+  if (!acceptedCommands.includes(message.split(' ')[1])) { return false; }
 
   return true;
 };
@@ -113,7 +113,7 @@ client.on('ready', () => {
 });
 
 client.on('messageCreate', async (msg) => {
-  const cleanMessage = msg.content.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const cleanMessage = msg.content.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   let returnMessage = '';
 
   if (msg.author.bot) return;
@@ -132,18 +132,18 @@ client.on('messageCreate', async (msg) => {
           Key: 'name',
           Values: [
             '!development',
-            ]
+          ],
         },
-        ],
-      SortOrder: 'asc'
+      ],
+      SortOrder: 'asc',
     };
 
     listSecrets(params).then((data) => {
-      if (data.length == 0) {return sendMessage('Nenhum resultado encontrado')};
+      if (data.length === 0) { return sendMessage('Nenhum resultado encontrado'); }
 
       const message = formatListMessage(data);
 
-      if (nextToken) {sendMessage('\n Para ver mais resultados, digite: `!aws next`', msg.channel)};
+      if (nextToken) { sendMessage('\n Para ver mais resultados, digite: `!aws next`', msg.channel); }
 
       return sendMessage(message, msg.author);
     })
@@ -154,15 +154,18 @@ client.on('messageCreate', async (msg) => {
   }
 
   if ((cleanMessage.search('next') != -1)) {
-    if (!nextToken) {return sendMessage('Não há mais resultados', msg.channel)};
+    if (!nextToken) { return sendMessage('Não há mais resultados', msg.channel); }
 
     getNextValues(nextToken).then((data) => {
-      if (data.SecretList.length == 0) {return sendMessage('Nenhum resultado encontrado', msg.channel)};
+      if (data.SecretList.length == 0) { return sendMessage('Nenhum resultado encontrado', msg.channel); }
 
-      const secrets = data.SecretList.filter(secret => secret.Name.search("development") != -1);
+      const secrets = data.SecretList.filter((secret) => secret.Name.search('development') != -1);
       if (secrets.length == 0) {
-        if (data.NextToken) {sendMessage('Não há resultados válidos nesta página, para ver mais resultados, digite: `!aws next`', msg.channel)};
-        else {sendMessage('Não há mais resultados', msg.channel)};
+        if (data.NextToken) {
+          sendMessage('Não há resultados válidos nesta página, para ver mais resultados, digite: `!aws next`', msg.channel);
+        } else {
+          sendMessage('Não há mais resultados', msg.channel);
+        }
         return;
       }
 
@@ -179,18 +182,18 @@ client.on('messageCreate', async (msg) => {
   if ((cleanMessage.search('secret') != -1)) {
     try {
       const secretName = cleanMessage.split(' ')[2];
-      if (!secretName) {return sendMessage('Nome do Secret não informado', msg.channel)};
+      if (!secretName) { return sendMessage('Nome do Secret não informado', msg.channel); }
 
       const params = {
-          SecretId: secretName
-        };
+        SecretId: secretName,
+      };
 
       secretsManager.getSecretValue(params, (err, data) => {
         if (err) {
           console.log(err, err.stack);
           sendMessage('Problemas ao tentar buscar o Secret', msg.channel);
         } else {
-          if (!data?.SecretString) {throw new Error('Secret não encontrado')};
+          if (!data?.SecretString) { throw new Error('Secret não encontrado'); }
 
           // Ready each property in data.SecretString object and send it to the channel
           const secret = JSON.parse(data.SecretString);
