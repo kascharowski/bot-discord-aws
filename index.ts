@@ -64,12 +64,13 @@ const formatListMessage = (data: aws.SecretsManager.SecretListEntry[]) => {
   return message;
 };
 
-const formatSecretValuesMessage = (secret: Object) => {
+const formatSecretValuesMessage = (secret: Object): string[] => {
   try {
     // If message is too long split it into multiple messages
     let message = '';
     const messageArray = [];
 
+    // eslint-disable-next-line no-restricted-syntax
     for (const key in secret) {
       // Before adding the key to the message, check if the message is too long(2000 characters)
       if (message.length + key.length + secret[key].length + 1 > 1999) {
@@ -78,10 +79,12 @@ const formatSecretValuesMessage = (secret: Object) => {
       } else {
         // On mongoDB secrets, remove user and password from connection string, all after: mongodb:// and before @, and replace with <user>:<password>
         if (key.search('mongoDB') !== -1) {
+          // eslint-disable-next-line no-param-reassign
           secret[key] = secret[key].replace(/mongodb:\/\/(.*)@/, 'mongodb://<user>:<password>@');
         }
         // If key is a password, replace value with <password>
         if (key.toLowerCase().search('password') !== -1) {
+          // eslint-disable-next-line no-param-reassign
           secret[key] = '<password>';
         }
         message += `\`${key}=${secret[key]}\`\n`;
@@ -94,13 +97,20 @@ const formatSecretValuesMessage = (secret: Object) => {
   }
 };
 
-const checkCommands = (message) => {
+const checkCommands = (message: string): boolean => {
   if (!acceptedCommands.includes(message.split(' ')[1])) { return false; }
 
   return true;
 };
 
-const sendMessage = async (message, channel) => {
+type discordChannel = discordJs.DMChannel
+  | discordJs.PartialDMChannel
+  | discordJs.NewsChannel
+  | discordJs.TextChannel
+  | discordJs.ThreadChannel
+  | discordJs.User
+
+const sendMessage = async (message: string, channel: discordChannel) => {
   try {
     await channel.send(message);
   } catch (error) {
@@ -125,7 +135,7 @@ client.on('messageCreate', async (msg) => {
     return sendMessage(returnMessage, msg.channel);
   }
 
-  if ((cleanMessage.search('list') != -1)) {
+  if ((cleanMessage.search('list') !== -1)) {
     const params = {
       Filters: [
         {
@@ -139,7 +149,7 @@ client.on('messageCreate', async (msg) => {
     };
 
     listSecrets(params).then((data) => {
-      if (data.length === 0) { return sendMessage('Nenhum resultado encontrado'); }
+      if (data.length === 0) { return sendMessage('Nenhum resultado encontrado', msg.channel); }
 
       const message = formatListMessage(data);
 
@@ -157,9 +167,9 @@ client.on('messageCreate', async (msg) => {
     if (!nextToken) { return sendMessage('Não há mais resultados', msg.channel); }
 
     getNextValues(nextToken).then((data) => {
-      if (data.SecretList.length == 0) { return sendMessage('Nenhum resultado encontrado', msg.channel); }
+      if (data.SecretList.length === 0) { return sendMessage('Nenhum resultado encontrado', msg.channel); }
 
-      const secrets = data.SecretList.filter((secret) => secret.Name.search('development') != -1);
+      const secrets = data.SecretList.filter((secret) => secret.Name.search('development') !== -1);
       if (secrets.length == 0) {
         if (data.NextToken) {
           sendMessage('Não há resultados válidos nesta página, para ver mais resultados, digite: `!aws next`', msg.channel);
@@ -179,7 +189,7 @@ client.on('messageCreate', async (msg) => {
     });
   }
 
-  if ((cleanMessage.search('secret') != -1)) {
+  if ((cleanMessage.search('secret') !== -1)) {
     try {
       const secretName = cleanMessage.split(' ')[2];
       if (!secretName) { return sendMessage('Nome do Secret não informado', msg.channel); }
