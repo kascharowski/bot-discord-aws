@@ -18,7 +18,6 @@
   },
   "homepage": "https://github.com/kascharowski/bot-discord-aws#readme",
   "dependencies": {
-    "-": "^0.0.1",
     "@discordjs/rest": "^0.3.0",
     "aws-sdk": "^2.1091.0",
     "discord-api-types": "^0.29.0",
