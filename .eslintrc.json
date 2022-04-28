@@ -15,5 +15,11 @@
         "@typescript-eslint"
     ],
     "rules": {
+    },
+    "linterOptions": {
+        "exclude": [
+            "node_modules",
+            "dist"
+        ]
     }
 }
